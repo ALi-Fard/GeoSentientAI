@@ -5,3 +5,7 @@ scikit-learn
 streamlit
 fastapi
 uvicorn
+requests
+rasterio
+pystac-client
+tqdm
