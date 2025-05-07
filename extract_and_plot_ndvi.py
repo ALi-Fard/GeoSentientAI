@@ -1,25 +1,23 @@
 
 import os
-import requests
 import zipfile
+import gdown
 import rasterio
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Download parameters
-GDRIVE_URL = "https://drive.google.com/uc?export=download&id=1WPFexy8fB44N4b9DAo9kuZs-vytthtsh"
+# Google Drive file ID
+FILE_ID = "1WPFexy8fB44N4b9DAo9kuZs-vytthtsh"
 ZIP_FILENAME = "S2A_SAFE.zip"
 SAFE_FOLDER_NAME = "S2A_MSIL2A_20250416T191831_N0511_R056_T10UDV_20250417T014615.SAFE"
 
-# Step 1: Download ZIP from Google Drive
+# Step 1: Download ZIP using gdown
 if not os.path.exists(ZIP_FILENAME):
-    print("📥 Downloading .SAFE ZIP file...")
-    response = requests.get(GDRIVE_URL)
-    with open(ZIP_FILENAME, "wb") as f:
-        f.write(response.content)
-    print("✅ Downloaded:", ZIP_FILENAME)
+    print("📥 Downloading .SAFE ZIP file from Google Drive...")
+    gdown.download(f"https://drive.google.com/uc?id={FILE_ID}", ZIP_FILENAME, quiet=False)
+    print("✅ Download complete:", ZIP_FILENAME)
 
-# Step 2: Unzip it if needed
+# Step 2: Unzip
 if not os.path.exists(SAFE_FOLDER_NAME):
     print("🗂️ Extracting:", ZIP_FILENAME)
     with zipfile.ZipFile(ZIP_FILENAME, 'r') as zip_ref:
