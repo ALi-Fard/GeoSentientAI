@@ -1,54 +1,54 @@
 
-import numpy as np
+import planetary_computer
+import pystac_client
 import rasterio
+import numpy as np
 import matplotlib.pyplot as plt
-from pystac_client import Client
-from planetary_computer import sign
+from rasterio.plot import show
 from shapely.geometry import box
+import geopandas as gpd
 
-# Vancouver coordinates
-bbox = [-122.95, 49.15, -122.85, 49.25]  # [west, south, east, north]
-bbox_geom = box(*bbox)
+# Define Area of Interest (Vancouver area)
+bbox = [-123.1, 49.1, -122.8, 49.3]  # [min lon, min lat, max lon, max lat]
+aoi_geom = box(*bbox)
 
-# Connect to Planetary Computer
-api_url = "https://planetarycomputer.microsoft.com/api/stac/v1"
-client = Client.open(api_url)
+# Create GeoDataFrame for bbox
+aoi = gpd.GeoDataFrame({"geometry": [aoi_geom]}, crs="EPSG:4326")
 
-# Search for Sentinel-2 data
-search = client.search(
+# Connect to Planetary Computer STAC
+catalog = pystac_client.Client.open("https://planetarycomputer.microsoft.com/api/stac/v1")
+search = catalog.search(
     collections=["sentinel-2-l2a"],
-    bbox=bbox,
-    datetime="2023-08-01/2023-08-10",
-    query={"eo:cloud_cover": {"lt": 20}},
-    limit=1
+    intersects=aoi_geom,
+    query={"eo:cloud_cover": {"lt": 10}},
+    sortby=[{"field": "properties.datetime", "direction": "desc"}],
+    limit=1,
 )
 
-items = list(search.get_items())
-if not items:
-    raise ValueError("No data found for the given coordinates and date.")
-item = items[0]
+item = next(search.get_items())
+print("Found image:", item.id)
 
-# Sign asset URLs for download
-item = sign(item)
+# Sign the item to access it
+signed_item = planetary_computer.sign(item)
 
-# Load RED and NIR bands
-red_href = item.assets["B04"].href
-nir_href = item.assets["B08"].href
+# Load bands B04 (red) and B08 (nir)
+red_asset = signed_item.assets["B04"].href
+nir_asset = signed_item.assets["B08"].href
 
-with rasterio.open(red_href) as red_src:
+with rasterio.open(red_asset) as red_src, rasterio.open(nir_asset) as nir_src:
     red = red_src.read(1).astype("float32")
-    red_meta = red_src.meta
-
-with rasterio.open(nir_href) as nir_src:
     nir = nir_src.read(1).astype("float32")
+    profile = red_src.profile
 
-# Compute NDVI
-ndvi = (nir - red) / (nir + red + 1e-5)
+# Calculate NDVI
+ndvi = (nir - red) / (nir + red)
+ndvi = np.clip(ndvi, -1, 1)
 
 # Plot NDVI
 plt.figure(figsize=(8, 6))
-plt.imshow(ndvi, cmap="RdYlGn")
-plt.colorbar(label="NDVI")
-plt.title("NDVI over Vancouver (Sentinel-2)")
+ndvi_plot = plt.imshow(ndvi, cmap="RdYlGn", vmin=-1, vmax=1)
+plt.colorbar(ndvi_plot, label="NDVI")
+plt.title("NDVI - Sentinel-2 - Vancouver")
 plt.axis("off")
+plt.tight_layout()
 plt.show()
